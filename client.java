@@ -59,11 +59,11 @@ public class client {
                 double rtt = (double) (endTime - startTime);
 
                 if (response instanceof Message.TextMessage text) {
-                    System.out.println(text.msg());
-
                     if (text.msg().equalsIgnoreCase("disconnected")) {
                         System.out.println("exit");
                         break;
+                    } else {
+                        System.out.println(text.msg());
                     }
                 } else if (response instanceof Message.ErrorMessage error) {
                     System.out.println(error.msg());
