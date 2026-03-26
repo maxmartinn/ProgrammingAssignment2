@@ -36,53 +36,78 @@ public class server {
 			DataInputStream din = new DataInputStream(clientSocket.getInputStream());
 
 			// Send the welcome message to the client.
-			Messages.sendTextMessage("Hello!", dout);
+			new Message.TextMessage("Hello!").send(dout);
 
-			// Loop until we get the exit message
-			while (true) {
-				String msg = Messages.readTextMessage(din);
+			// Loop until we get the exit message.
+			boolean exit = false;
+			while (!exit) {
+				// Receive the next message from the client.
+				Message msg = Message.recv(din);
 
-				// If we get the exit message, we exit.
-				if (msg == "bye") {
-					break;
-				}
+				switch (msg) {
+					case Message.TextMessage tm -> {
+						// If we get the exit message, we exit.
+						if (tm.msg() == "bye") {
+							exit = true;
+							break;
+						}
 
-				byte[] data;
+						// Array to store the file data in.
+						byte[] data;
 
-				// Try to read the file and send it to the client.
-				try {
-					Path path = Paths.get(msg);
-					data = Files.readAllBytes(path);
-				}
-				// Handle any exception if it occurs.
-				catch (IOException e) {
-					// If file not found error, send back "File not found" message.
-					if (e instanceof FileNotFoundException) {
-						Messages.sendErrorMessage("File not found", dout);
+						// Try to read the file and send it to the client.
+						try {
+							Path path = Paths.get(tm.msg());
+							data = Files.readAllBytes(path);
+						}
+
+						// Handle any exception if it occurs.
+						catch (IOException e) {
+							// If file not found error, send back "File not found" message.
+							if (e instanceof FileNotFoundException) {
+								new Message.ErrorMessage("File not found").send(dout);
+							}
+
+							// If we do not know the error type exactly, send back a general
+							// error message.
+							else {
+								new Message.ErrorMessage(String.format(
+										"unknown error (%s) while trying to read file %s",
+										e.toString(), msg)).send(dout);
+							}
+
+							// If we caught an exception while dealing with the file, skip
+							// trying to send it
+							// to the client.
+							break;
+						}
+
+						// Send a binary message with the file contents in it.
+						new Message.BinaryMessage(data).send(dout);
+
 					}
-					// If we do not know the error type exactly, send back a general error message.
-					else {
-						Messages.sendErrorMessage(String.format(
-								"unknown error (%s) while trying to read file %s",
-								e.toString(), msg), dout);
+					// If it's an error message, print it to the console.
+					case Message.ErrorMessage em -> {
+						System.out.println(String.format("client error: %s", em.msg()));
 					}
-					// If we caught an exception while dealing with the file, skip trying to send it
-					// to the client.
-					continue;
+					// If its a binary message, send back an error as the server doesn't accept
+					// binary messages.
+					case Message.BinaryMessage bm -> {
+						new Message.ErrorMessage("server doesn't support binary messages")
+								.send(dout);
+					}
 				}
-
-				Messages.sendDataMessage(data, dout);
 			}
 
 			// Send the disconnected message to the client then close the socket.
-			Messages.sendTextMessage("disconnected", dout);
+			new Message.TextMessage("disconnected").send(dout);
 			clientSocket.close();
 		}
+
 		// If a socket error occurred, print it.
 		catch (IOException e) {
 			System.out.println(String.format("failed to communicate with client (%s)", e.toString()));
 			return;
 		}
 	}
-
 }
