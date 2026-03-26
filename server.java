@@ -36,11 +36,11 @@ public class server {
 			DataInputStream din = new DataInputStream(clientSocket.getInputStream());
 
 			// Send the welcome message to the client.
-			sendTextMessage("Hello!", dout);
+			Messages.sendTextMessage("Hello!", dout);
 
 			// Loop until we get the exit message
 			while (true) {
-				String msg = readTextMessage(din);
+				String msg = Messages.readTextMessage(din);
 
 				// If we get the exit message, we exit.
 				if (msg == "bye") {
@@ -58,11 +58,11 @@ public class server {
 				catch (IOException e) {
 					// If file not found error, send back "File not found" message.
 					if (e instanceof FileNotFoundException) {
-						sendErrorMessage("File not found", dout);
+						Messages.sendErrorMessage("File not found", dout);
 					}
 					// If we do not know the error type exactly, send back a general error message.
 					else {
-						sendErrorMessage(String.format(
+						Messages.sendErrorMessage(String.format(
 								"unknown error (%s) while trying to read file %s",
 								e.toString(), msg), dout);
 					}
@@ -71,11 +71,11 @@ public class server {
 					continue;
 				}
 
-				sendDataMessage(data, dout);
+				Messages.sendDataMessage(data, dout);
 			}
 
 			// Send the disconnected message to the client then close the socket.
-			sendTextMessage("disconnected", dout);
+			Messages.sendTextMessage("disconnected", dout);
 			clientSocket.close();
 		}
 		// If a socket error occurred, print it.
@@ -85,62 +85,4 @@ public class server {
 		}
 	}
 
-	// Writes a text message.
-	static void sendTextMessage(String msg, DataOutputStream dout) throws IOException {
-		dout.writeByte(0);
-		dout.writeUTF(msg);
-	}
-
-	// Writes an error message.
-	static void sendErrorMessage(String msg, DataOutputStream dout) throws IOException {
-		dout.writeByte(1);
-		dout.writeUTF(msg);
-	}
-
-	// Writes a data message.
-	static void sendDataMessage(byte[] data, DataOutputStream dout) throws IOException {
-		dout.writeByte(2);
-		dout.writeInt(data.length);
-		dout.write(data);
-	}
-
-	// Reads a text message.
-	static String readTextMessage(DataInputStream din) throws IOException {
-		// Check the message is the correct type.
-		byte msgType = din.readByte();
-		if (msgType != 0) {
-			throw new IOException(String.format("got unexpected message type %d, expected 0", msgType));
-		}
-
-		return din.readUTF();
-	}
-
-	// Reads an error message.
-	static String readErrorMessage(DataInputStream din) throws IOException {
-		// Check the message is the correct type.
-		byte msgType = din.readByte();
-		if (msgType != 1) {
-			throw new IOException(String.format("got unexpected message type %d, expected 1", msgType));
-		}
-
-		return din.readUTF();
-
-	}
-
-	// Reads a data message.
-	static byte[] readDataMessage(DataInputStream din) throws IOException {
-		// Check the message is the correct type.
-		byte msgType = din.readByte();
-		if (msgType != 2) {
-			throw new IOException(String.format("got unexpected message type %d, expected 2", msgType));
-		}
-
-		// Read the length of the message and allocate a buffer to store it.
-		int length = din.readInt();
-		byte[] data = new byte[length];
-
-		// Read and return the message.
-		din.read(data);
-		return data;
-	}
 }
