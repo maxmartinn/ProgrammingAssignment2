@@ -1,8 +1,12 @@
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 public class server {
 	public static void main(String[] args) {
@@ -43,13 +47,39 @@ public class server {
 					break;
 				}
 
-				sendErrorMessage("File not found", dout);
+				byte[] data;
+
+				// Try to read the file and send it to the client.
+				try {
+					Path path = Paths.get(msg);
+					data = Files.readAllBytes(path);
+				}
+				// Handle any exception if it occurs.
+				catch (IOException e) {
+					// If file not found error, send back "File not found" message.
+					if (e instanceof FileNotFoundException) {
+						sendErrorMessage("File not found", dout);
+					}
+					// If we do not know the error type exactly, send back a general error message.
+					else {
+						sendErrorMessage(String.format(
+								"unknown error (%s) while trying to read file %s",
+								e.toString(), msg), dout);
+					}
+					// If we caught an exception while dealing with the file, skip trying to send it
+					// to the client.
+					continue;
+				}
+
+				sendDataMessage(data, dout);
 			}
 
 			// Send the disconnected message to the client then close the socket.
 			sendTextMessage("disconnected", dout);
 			clientSocket.close();
-		} catch (IOException e) {
+		}
+		// If a socket error occurred, print it.
+		catch (IOException e) {
 			System.out.println(String.format("failed to communicate with client (%s)", e.toString()));
 			return;
 		}
@@ -77,8 +107,9 @@ public class server {
 	// Reads a text message.
 	static String readTextMessage(DataInputStream din) throws IOException {
 		// Check the message is the correct type.
-		if (din.readByte() != 0) {
-			throw new IOException("got unexpected message type");
+		byte msgType = din.readByte();
+		if (msgType != 0) {
+			throw new IOException(String.format("got unexpected message type %d, expected 0", msgType));
 		}
 
 		return din.readUTF();
@@ -87,8 +118,9 @@ public class server {
 	// Reads an error message.
 	static String readErrorMessage(DataInputStream din) throws IOException {
 		// Check the message is the correct type.
-		if (din.readByte() != 1) {
-			throw new IOException("got unexpected message type");
+		byte msgType = din.readByte();
+		if (msgType != 1) {
+			throw new IOException(String.format("got unexpected message type %d, expected 1", msgType));
 		}
 
 		return din.readUTF();
@@ -98,8 +130,9 @@ public class server {
 	// Reads a data message.
 	static byte[] readDataMessage(DataInputStream din) throws IOException {
 		// Check the message is the correct type.
-		if (din.readByte() != 2) {
-			throw new IOException("got unexpected message type");
+		byte msgType = din.readByte();
+		if (msgType != 2) {
+			throw new IOException(String.format("got unexpected message type %d, expected 2", msgType));
 		}
 
 		// Read the length of the message and allocate a buffer to store it.
